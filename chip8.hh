@@ -8,11 +8,15 @@ static constexpr unsigned int REGISTER_COUNT = 16;
 static constexpr unsigned int MEMORY_SIZE = 4096;
 static constexpr unsigned int STACK_LEVEL = 16;
 
+static constexpr unsigned int DISPLAY_WIDTH = 64;
+static constexpr unsigned int DISPLAY_HEIGHT = 32;
+
 class Chip8 {
     public:
 	Chip8();
         void LoadROM(char const* filename);
 	void EmulateCycle();
+	uint8_t display[DISPLAY_WIDTH * DISPLAY_HEIGHT]
     private:
         uint8_t memory[MEMORY_SIZE]{};
         uint8_t V[REGISTER_COUNT]{};
@@ -87,6 +91,4 @@ class Chip8 {
 	void opcodeFx33(uint16_t opcode);
 	void opcodeFx55(uint16_t opcode);
 	void opcodeFx65(uint16_t opcode);
-	
-
 };
