@@ -70,8 +70,6 @@ void Chip8::LoadROM(const char* filename) {
 
 void Chip8::EmulateCycle() {
     uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
-    printf("Current opcode: %u\n", (unsigned int)opcode);    
-    printf("Current memory: %u\n", (unsigned int)memory[pc]);	
     pc += 2;
     
     uint16_t index = (opcode & 0xF000) >> 12; 
@@ -81,26 +79,44 @@ void Chip8::EmulateCycle() {
     } else { 
 	throw std::runtime_error("Unhandled opcode, exiting program."); 
     }
-
-    // check first nibble, if 0, 8, e, f, move to subtable, else check table?
-
 }
 
 void Chip8::opcode0xxx(uint16_t opcode) {
-    uint16_t trailing_id = (opcode & 0x00FF) << 8;
+    uint16_t byte = (opcode & 0x00FF) << 8;
 
-    // 0x00E0	0000 0000 1110 0000
-    // 0xE0	1110 0000 0000 0000
-
-    if(opcode_st0[trailing_id]) {
-	(this->*opcode_st0[trailing_id](opcode);
+    if(opcode_st0[byte]) {
+	(this->*opcode_st0[byte])(opcode);
     } else {
 	// unhandled machine code routine call
     }
 }
 
+void Chip8::opcode8xyx(uint16_t opcode) {
+    uint16_t byte = (opcode & 0x00FF) << 8;
+
+    if(opcode_st8[byte]) {
+	(this->*opcode_st8[byte])(opcode);
+    }
+}
+
+void Chip8::opcodeExxx(uint16_t opcode) { 
+    uint16_t byte = (opcode & 0x00FF) << 8;
+
+    if(opcode_st8[byte]) {
+	(this->*opcode_stE[byte])(opcode);
+    }
+}
+
+void Chip8::opcodeFxxx(uint16_t opcode) {
+    uint16_t byte = (opcode & 0x00FF) << 8;
+
+    if(opcode_st8[byte]) {
+	(this->*opcode_stF[byte])(opcode);
+    }
+}
+
 void Chip8::opcode00E0(uint16_t opcode) {
-    std::memset(video, 0, sizeof(video));
+    std::memset(display, 0, sizeof(display));
 }
 
 void Chip8::opcode00EE(uint16_t opcode) {
@@ -137,7 +153,7 @@ void Chip8::opcode4xnn(uint16_t opcode) {
 
 void Chip8::opcode5xy0(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
-    uint8_t y = (opcode & 0x00F0 >> 4;
+    uint8_t y = (opcode & 0x00F0) >> 4;
     
     if(V[x] == V[y]) {
 	pc += 2;    
@@ -159,7 +175,7 @@ void Chip8::opcode8xy0(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
-    V[x] = V[y]
+    V[x] = V[y];
 }
 void Chip8::opcode8xy1(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
@@ -179,7 +195,7 @@ void Chip8::opcode8xy3(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
-    V[x] ^= [y];
+    V[x] ^= V[y];
 }
 void Chip8::opcode8xy4(uint16_t opcode) { 
     uint8_t x = (opcode & 0x0F00) >> 8;
@@ -208,7 +224,7 @@ void Chip8::opcode8xy7(uint16_t opcode) {
     uint8_t y = (opcode & 0x000F) >> 4;
 
     V[0xF] = (V[x] >= V[y]) ? 1 : 0;
-    v[x] = V[y] - V[x];
+    V[x] = V[y] - V[x];
 }
 
 void Chip8::opcode8xyE(uint16_t opcode) {
@@ -228,7 +244,7 @@ void Chip8::opcode9xy0(uint16_t opcode) {
 }
 
 void Chip8::opcodeAnnn(uint16_t opcode) {
-    index = opcode & 0x0FFF
+    I = opcode & 0x0FFF;
 }
 void Chip8::opcodeBnnn(uint16_t opcode) {
     pc = V[0x0] + (opcode & 0x0FFF);
