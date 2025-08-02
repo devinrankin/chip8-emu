@@ -16,7 +16,7 @@ class Chip8 {
 	Chip8();
         void LoadROM(char const* filename);
 	void EmulateCycle();
-	uint8_t display[DISPLAY_WIDTH * DISPLAY_HEIGHT]
+	uint8_t display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     private:
         uint8_t memory[MEMORY_SIZE]{};
         uint8_t V[REGISTER_COUNT]{};
