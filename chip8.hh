@@ -16,7 +16,7 @@ class Chip8 {
     private:
         uint8_t memory[MEMORY_SIZE]{};
         uint8_t V[REGISTER_COUNT]{};
-        uint16_t index_register{};
+        uint16_t I{};
         uint16_t pc{};
 
         uint8_t stack[STACK_LEVEL]{};
