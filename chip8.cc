@@ -1,8 +1,7 @@
 #include "chip8.hh"
 #include <iostream>
 #include <cstring>
-#include <unistd.h>
-
+#include <chrono>
 
 static constexpr unsigned int START_ADDRESS = 0x200;
 static constexpr unsigned int FONTSET_SIZE = 80;
@@ -27,10 +26,12 @@ uint8_t fontset[FONTSET_SIZE] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 };
 
-Chip8::Chip8() {
+Chip8::Chip8() : rng(std::chrono::system_clock::now().time_since_epoch().count()) {
     pc = START_ADDRESS;
     sp = 0;
     std::memset(memory, 0, sizeof(memory));
+
+    rand_byte = std::uniform_int_distribution<uint8_t>(0,255);
 
     for(unsigned int i = 0; i < FONTSET_SIZE; i++) {
 	memory[FONTSET_START_ADDRESS + i] = fontset[i];
@@ -293,7 +294,13 @@ void Chip8::opcodeAnnn(uint16_t opcode) {
 void Chip8::opcodeBnnn(uint16_t opcode) {
     pc = V[0x0] + (opcode & 0x0FFF);
 }
+
+// RND Vx, byte
 void Chip8::opcodeCxkk(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t kk = opcode & 0x00FF;
+
+    V[x] = rand_byte(rng) & kk;
 }
 
 // DRW Vx, Vy, height
@@ -396,7 +403,7 @@ void Chip8::opcodeFx1E(uint16_t opcode) {
 void Chip8::opcodeFx29(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
-    I = FONT_START_ADDRESS + (V[x] * 5);
+    I = FONTSET_START_ADDRESS + (V[x] * 5);
 }
 
 // LD B, Vx

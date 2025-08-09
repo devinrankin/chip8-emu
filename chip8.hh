@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cstdint>
 #include <memory>
+#include <random>
 
 static constexpr unsigned int REGISTER_COUNT = 16;
 static constexpr unsigned int MEMORY_SIZE = 4096;
@@ -10,6 +11,8 @@ static constexpr unsigned int STACK_LEVEL = 16;
 
 static constexpr unsigned int DISPLAY_WIDTH = 64;
 static constexpr unsigned int DISPLAY_HEIGHT = 32;
+
+static constexpr unsigned int KEY_COUNT = 16;
 
 class Chip8 {
     public:
@@ -34,6 +37,9 @@ class Chip8 {
 	uint8_t delay_timer{};
 	uint8_t sound_timer{};
 
+	std::default_random_engine rng;
+	std::uniform_int_distribution<uint8_t> rand_byte;
+	
 	using OpcodeHandler = void(Chip8::*)(uint16_t);
 	OpcodeHandler opcode_table[16];
 	/*
