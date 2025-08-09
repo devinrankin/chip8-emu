@@ -1,32 +1,38 @@
 #include "chip8.hh"
 #include <iostream>
 #include <cstring>
+#include <chrono>
+    #include <unistd.h>
+
 
 static constexpr unsigned int START_ADDRESS = 0x200;
+static constexpr unsigned int FONT_SIZE = 80;
+static constexpr unsigned int FONT_START_ADDRESS = 0x050;
 
 Chip8::Chip8() {
     pc = START_ADDRESS;
+    sp = 0;
     std::memset(memory, 0, sizeof(memory));
 
-    opcode_table[0x0] = &Chip8::opcode0xxx;
+    opcode_table[0x0] = &Chip8::opcode0_lookup;
     opcode_table[0x1] = &Chip8::opcode1nnn;
     opcode_table[0x2] = &Chip8::opcode2nnn;
-    opcode_table[0x3] = &Chip8::opcode3xnn;
-    opcode_table[0x4] = &Chip8::opcode4xnn;
+    opcode_table[0x3] = &Chip8::opcode3xkk;
+    opcode_table[0x4] = &Chip8::opcode4xkk;
     opcode_table[0x5] = &Chip8::opcode5xy0;
-    opcode_table[0x6] = &Chip8::opcode6xnn;
-    opcode_table[0x7] = &Chip8::opcode7xnn;
-    opcode_table[0x8] = &Chip8::opcode8xyx;
+    opcode_table[0x6] = &Chip8::opcode6xkk;
+    opcode_table[0x7] = &Chip8::opcode7xkk;
+    opcode_table[0x8] = &Chip8::opcode8_lookup;
     opcode_table[0x9] = &Chip8::opcode9xy0;
     opcode_table[0xA] = &Chip8::opcodeAnnn;
     opcode_table[0xB] = &Chip8::opcodeBnnn;
-    opcode_table[0xC] = &Chip8::opcodeCxnn;
+    opcode_table[0xC] = &Chip8::opcodeCxkk;
     opcode_table[0xD] = &Chip8::opcodeDxyn;
-    opcode_table[0xE] = &Chip8::opcodeExxx;
-    opcode_table[0xF] = &Chip8::opcodeFxxx;
+    opcode_table[0xE] = &Chip8::opcodeE_lookup;
+    opcode_table[0xF] = &Chip8::opcodeF_lookup;
    
-    opcode_st0[0xE0] = &Chip8::opcode00E0;
-    opcode_st0[0xEE] = &Chip8::opcode00EE;
+    opcode_st0[0x0] = &Chip8::opcode00E0;
+    opcode_st0[0xE] = &Chip8::opcode00EE;
 
     opcode_st8[0x0] = &Chip8::opcode8xy0;
     opcode_st8[0x1] = &Chip8::opcode8xy1;
@@ -38,8 +44,8 @@ Chip8::Chip8() {
     opcode_st8[0x7] = &Chip8::opcode8xy7;
     opcode_st8[0xE] = &Chip8::opcode8xyE;
 
-    opcode_stE[0x9E] = &Chip8::opcodeEx9E;
-    opcode_stE[0xA1] = &Chip8::opcodeExA1;
+    opcode_stE[0xE] = &Chip8::opcodeEx9E;
+    opcode_stE[0x1] = &Chip8::opcodeExA1;
 
     opcode_stF[0x07] = &Chip8::opcodeFx07;
     opcode_stF[0x0A] = &Chip8::opcodeFx0A;
@@ -52,7 +58,7 @@ Chip8::Chip8() {
     opcode_stF[0x65] = &Chip8::opcodeFx65;
 }
 
-void Chip8::LoadROM(const char* filename) {
+void Chip8::load_rom(const char* filename) {
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     
     std::streamsize size = file.tellg();
@@ -68,12 +74,11 @@ void Chip8::LoadROM(const char* filename) {
     printf("Loaded ROM with size of %luB.\n", size);
 }
 
-void Chip8::EmulateCycle() {
-    uint16_t opcode = memory[pc] << 8 | memory[pc + 1];
+void Chip8::emulate_cycle() {
+    uint16_t opcode = (memory[pc] << 8) | memory[pc + 1];
     pc += 2;
     
     uint16_t index = (opcode & 0xF000) >> 12; 
-
     if(opcode_table[index]) { 
 	(this->*opcode_table[index])(opcode); 
     } else { 
@@ -81,76 +86,71 @@ void Chip8::EmulateCycle() {
     }
 }
 
-void Chip8::opcode0xxx(uint16_t opcode) {
-    uint16_t byte = (opcode & 0x00FF) << 8;
+void Chip8::opcode0_lookup(uint16_t opcode) {
+    uint16_t index = (opcode & 0x000F);
 
-    if(opcode_st0[byte]) {
-	(this->*opcode_st0[byte])(opcode);
+    if(opcode_st0[index]) {
+	(this->*opcode_st0[index])(opcode);
     } else {
 	// unhandled machine code routine call
     }
 }
 
-void Chip8::opcode8xyx(uint16_t opcode) {
-    uint16_t byte = (opcode & 0x00FF) << 8;
-
-    if(opcode_st8[byte]) {
-	(this->*opcode_st8[byte])(opcode);
-    }
+void Chip8::opcode8_lookup(uint16_t opcode) {
+    (this->*opcode_st8[opcode & 0xF])(opcode);
 }
 
-void Chip8::opcodeExxx(uint16_t opcode) { 
-    uint16_t byte = (opcode & 0x00FF) << 8;
-
-    if(opcode_st8[byte]) {
-	(this->*opcode_stE[byte])(opcode);
-    }
+void Chip8::opcodeE_lookup(uint16_t opcode) { 
+    (this->*opcode_stE[opcode & 0xF])(opcode);
 }
 
-void Chip8::opcodeFxxx(uint16_t opcode) {
-    uint16_t byte = (opcode & 0x00FF) << 8;
-
-    if(opcode_st8[byte]) {
-	(this->*opcode_stF[byte])(opcode);
-    }
+void Chip8::opcodeF_lookup(uint16_t opcode) {	
+    (this->*opcode_stF[opcode & 0xFF])(opcode);
 }
 
+// CLS
 void Chip8::opcode00E0(uint16_t opcode) {
-    std::memset(display, 0, sizeof(display));
+   std::memset(display, 0, sizeof(display));
 }
 
+// RET
 void Chip8::opcode00EE(uint16_t opcode) {
     --sp;
     pc = stack[sp];
 }
 
+// JP addr
 void Chip8::opcode1nnn(uint16_t opcode) {
-    pc = opcode & 0x0FFF;
+     pc = opcode & 0x0FFF;
 }   
 
+// CALL addr
 void Chip8::opcode2nnn(uint16_t opcode) {
-    pc = stack[sp++];
+    stack[sp++] = pc;
     pc = opcode & 0x0FFF;
 }
 
-void Chip8::opcode3xnn(uint16_t opcode) {
+// SE Vx, byte
+void Chip8::opcode3xkk(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
-    uint8_t byte = opcode & 0x00FF;
+    uint8_t kk = opcode & 0x00FF;
 
-    if(V[x] == byte) {
+    if(V[x] == kk) {
 	pc += 2;
     }
 }
 
-void Chip8::opcode4xnn(uint16_t opcode) {
+// SNE Vx, byte
+void Chip8::opcode4xkk(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
-    uint8_t byte = opcode & 0x00FF;
+    uint8_t kk = opcode & 0x00FF;
 
-    if(V[x] != byte) {
+    if(V[x] != kk) {
 	pc += 2;
     }
 }
 
+// SE Vx, Vy
 void Chip8::opcode5xy0(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
@@ -159,24 +159,32 @@ void Chip8::opcode5xy0(uint16_t opcode) {
 	pc += 2;    
     }
 }
-void Chip8::opcode6xnn(uint16_t opcode) {
-    uint8_t x = (opcode & 0x0F00) >> 8;
-    uint8_t byte = opcode & 0x00FF;
 
-    V[x] = byte;
-}
-void Chip8::opcode7xnn(uint16_t opcode) {
+// LD Vx, byte
+void Chip8::opcode6xkk(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
-    uint8_t byte = opcode & 0x00FF;
+    uint8_t kk = opcode & 0x00FF;
 
-    V[x] += byte;
+    V[x] = kk;
 }
+
+// ADD Vx, byte
+void Chip8::opcode7xkk(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t kk = opcode & 0x00FF;
+
+    V[x] += kk;
+}
+
+// LD Vx, Vy
 void Chip8::opcode8xy0(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
     V[x] = V[y];
 }
+
+// OR Vx, Vy
 void Chip8::opcode8xy1(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x000F) >> 4;
@@ -184,6 +192,7 @@ void Chip8::opcode8xy1(uint16_t opcode) {
     V[x] |= V[y];
 }
 
+// AND Vx, Vy
 void Chip8::opcode8xy2(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
@@ -191,12 +200,15 @@ void Chip8::opcode8xy2(uint16_t opcode) {
     V[x] &= V[y];
 }
 
+// XOR Vx, Vy
 void Chip8::opcode8xy3(uint16_t opcode) { 
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
 
     V[x] ^= V[y];
 }
+
+// ADD Vx, Vy
 void Chip8::opcode8xy4(uint16_t opcode) { 
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
@@ -206,6 +218,7 @@ void Chip8::opcode8xy4(uint16_t opcode) {
     V[x] = sum & 0xFF;
 }
 
+// SUB Vy, Vx
 void Chip8::opcode8xy5(uint16_t opcode) { 
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
@@ -213,12 +226,16 @@ void Chip8::opcode8xy5(uint16_t opcode) {
     V[0xF] = (V[x] >= V[y]) ? 1 : 0;
     V[x] = V[x] - V[y];
 }
+
+// SHR Vx
 void Chip8::opcode8xy6(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     
     V[0xF] = V[x] & 0b0001;
     V[x] >>= 1;
 }
+
+// SUBN Vx, Vy
 void Chip8::opcode8xy7(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x000F) >> 4;
@@ -227,6 +244,7 @@ void Chip8::opcode8xy7(uint16_t opcode) {
     V[x] = V[y] - V[x];
 }
 
+// SHL Vx
 void Chip8::opcode8xyE(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     
@@ -234,6 +252,7 @@ void Chip8::opcode8xyE(uint16_t opcode) {
     V[x] <<= 1;
 }
 
+// SNE Vx, Vy
 void Chip8::opcode9xy0(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
@@ -243,48 +262,59 @@ void Chip8::opcode9xy0(uint16_t opcode) {
     }
 }
 
+// LD I, addr
 void Chip8::opcodeAnnn(uint16_t opcode) {
     I = opcode & 0x0FFF;
 }
+
+// JP V0, addr
 void Chip8::opcodeBnnn(uint16_t opcode) {
     pc = V[0x0] + (opcode & 0x0FFF);
 }
-void Chip8::opcodeCxnn(uint16_t opcode) {
-    
+void Chip8::opcodeCxkk(uint16_t opcode) {
 }
 void Chip8::opcodeDxyn(uint16_t opcode) {
-
 }
 void Chip8::opcodeEx9E(uint16_t opcode) {
-
 }
 void Chip8::opcodeExA1(uint16_t opcode) {
-
 }
 void Chip8::opcodeFx07(uint16_t opcode) {
-
 }
 void Chip8::opcodeFx0A(uint16_t opcode) {
-
 }
 void Chip8::opcodeFx15(uint16_t opcode) {
-
 }
 void Chip8::opcodeFx18(uint16_t opcode) {
-
 }
-void Chip8::opcodeFx1E(uint16_t opcode) {
 
+// add Vx, I
+void Chip8::opcodeFx1E(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    I += V[x];
 }
 void Chip8::opcodeFx29(uint16_t opcode) {
-
 }
 void Chip8::opcodeFx33(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t value = V[x];
 
+    memory[I] = value / 100;
+    memory[I + 1] = (value / 10) % 10;
+    memory[I + 2] = value % 10;
 }
 void Chip8::opcodeFx55(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
 
+    for(uint8_t i = 0; i <= x; ++i) {
+	memory[I + i] = V[i];
+    }
 }
 void Chip8::opcodeFx65(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
 
+    for(uint8_t i = 0; i <= x; ++i) {
+	V[i] = memory[I + i];
+    }
 }
