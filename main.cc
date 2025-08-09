@@ -1,7 +1,6 @@
 #include <memory>
 #include "chip8.hh"
 #include "graphics.hh"
-#include <SDL3/SDL.h>
 
 // Converting our Chip-8 display data to something readable by SDL
 void c8buff_to_rgba(const uint8_t* c8buff, uint32_t* out_buff, int width, int height) {
@@ -9,7 +8,6 @@ void c8buff_to_rgba(const uint8_t* c8buff, uint32_t* out_buff, int width, int he
 	out_buff[i] = c8buff[i] ? 0xFFFFFFFF : 0x000000FF;
     }
 }
-
 
 int main(int argc, char** argv) {
     Chip8 chip8;
