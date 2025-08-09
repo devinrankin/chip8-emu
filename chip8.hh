@@ -18,6 +18,10 @@ class Chip8 {
 	void emulate_cycle();
 	
 	uint8_t display[DISPLAY_WIDTH * DISPLAY_HEIGHT]{};
+	
+	uint8_t keypad[KEY_COUNT]{};
+        bool await_key_flag = false;
+        bool await_key_register{};    
     private:
         uint8_t memory[MEMORY_SIZE]{};
         uint8_t V[REGISTER_COUNT]{};

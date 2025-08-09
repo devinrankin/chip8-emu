@@ -323,9 +323,25 @@ void Chip8::opcodeDxyn(uint16_t opcode) {
         }
     }
 }
+
+// SKP Vx
 void Chip8::opcodeEx9E(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t key = V[x];
+
+    if(key < 16 && keypad[key]) {
+        pc += 2;
+    }
 }
+
+// SKNP Vx
 void Chip8::opcodeExA1(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t key = V[x];
+
+    if(key < 16 & !keypad[key]) {
+        pc +=2;
+    }
 }
 
 // LD Vx, DT
@@ -334,7 +350,25 @@ void Chip8::opcodeFx07(uint16_t opcode) {
 
     V[x] = delay_timer;
 }
+
+// LD Vx, K
 void Chip8::opcodeFx0A(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    if(!await_key_flag) {
+        await_key_flag = true;
+        await_key_register = x;
+        return;
+    }
+
+    for(uint8_t key = 0; key < 16; ++key) {
+        if(keypad[key]) {
+            V[await_key_register] = key;
+            await_key_flag = false;
+            pc += 2;
+            break;
+        }
+    }
 }
 
 // LD DT, Vx
