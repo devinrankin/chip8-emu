@@ -27,6 +27,9 @@ class Chip8 {
         uint16_t stack[STACK_LEVEL]{};
         uint16_t sp;      
 
+	uint8_t delay_timer{};
+	uint8_t sound_timer{};
+
 	using OpcodeHandler = void(Chip8::*)(uint16_t);
 	OpcodeHandler opcode_table[16];
 	/*

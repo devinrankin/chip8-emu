@@ -1,18 +1,40 @@
 #include "chip8.hh"
 #include <iostream>
 #include <cstring>
-#include <chrono>
-    #include <unistd.h>
+#include <unistd.h>
 
 
 static constexpr unsigned int START_ADDRESS = 0x200;
-static constexpr unsigned int FONT_SIZE = 80;
-static constexpr unsigned int FONT_START_ADDRESS = 0x050;
+static constexpr unsigned int FONTSET_SIZE = 80;
+static constexpr unsigned int FONTSET_START_ADDRESS = 0x050;
+
+uint8_t fontset[FONTSET_SIZE] = { 
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
 
 Chip8::Chip8() {
     pc = START_ADDRESS;
     sp = 0;
     std::memset(memory, 0, sizeof(memory));
+
+    for(unsigned int i = 0; i < FONTSET_SIZE; i++) {
+	memory[FONTSET_START_ADDRESS + i] = fontset[i];
+    }
 
     opcode_table[0x0] = &Chip8::opcode0_lookup;
     opcode_table[0x1] = &Chip8::opcode1nnn;
@@ -273,19 +295,60 @@ void Chip8::opcodeBnnn(uint16_t opcode) {
 }
 void Chip8::opcodeCxkk(uint16_t opcode) {
 }
+
+// DRW Vx, Vy, height
 void Chip8::opcodeDxyn(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+
+    uint8_t pos_x = V[x] % DISPLAY_WIDTH;
+    uint8_t pos_y = V[y] % DISPLAY_HEIGHT;
+
+    uint8_t height = opcode & 0x000F;
+
+    V[0xF] = 0;
+
+    for(unsigned int row = 0; row < height; ++row) {
+        uint8_t spr_byte = memory[I + row];
+        for(unsigned int col = 0; col < 8; ++col) {
+            if((spr_byte & (0x80 >> col)) == 0) continue;
+
+            int px_x = (pos_x + col) % DISPLAY_WIDTH;
+            int px_y = (pos_y + row) % DISPLAY_HEIGHT;
+
+            int idx = px_y * DISPLAY_WIDTH + px_x;
+            if(display[idx]) V[0xF] = 1;
+
+            display[idx] ^=1;
+        }
+    }
 }
 void Chip8::opcodeEx9E(uint16_t opcode) {
 }
 void Chip8::opcodeExA1(uint16_t opcode) {
 }
+
+// LD Vx, DT
 void Chip8::opcodeFx07(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    V[x] = delay_timer;
 }
 void Chip8::opcodeFx0A(uint16_t opcode) {
 }
+
+// LD DT, Vx
 void Chip8::opcodeFx15(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    delay_timer = V[x];
 }
+
+// LD ST, Vx
 void Chip8::opcodeFx18(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    sound_timer = V[x];
 }
 
 // add Vx, I
@@ -294,8 +357,15 @@ void Chip8::opcodeFx1E(uint16_t opcode) {
 
     I += V[x];
 }
+
+// LD I, Vx
 void Chip8::opcodeFx29(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    I = FONT_START_ADDRESS + (V[x] * 5);
 }
+
+// LD B, Vx
 void Chip8::opcodeFx33(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t value = V[x];
@@ -304,6 +374,8 @@ void Chip8::opcodeFx33(uint16_t opcode) {
     memory[I + 1] = (value / 10) % 10;
     memory[I + 2] = value % 10;
 }
+
+// LD [I], Vx
 void Chip8::opcodeFx55(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
@@ -311,6 +383,8 @@ void Chip8::opcodeFx55(uint16_t opcode) {
 	memory[I + i] = V[i];
     }
 }
+
+// LD Vx, [I]
 void Chip8::opcodeFx65(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
