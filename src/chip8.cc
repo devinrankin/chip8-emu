@@ -34,7 +34,7 @@ Chip8::Chip8() : rng(std::chrono::system_clock::now().time_since_epoch().count()
     rand_byte = std::uniform_int_distribution<uint8_t>(0,255);
 
     for(unsigned int i = 0; i < FONTSET_SIZE; i++) {
-	memory[FONTSET_START_ADDRESS + i] = fontset[i];
+        memory[FONTSET_START_ADDRESS + i] = fontset[i];
     }
 
     opcode_table[0x0] = &Chip8::opcode0_lookup;
@@ -91,7 +91,7 @@ void Chip8::load_rom(const char* filename) {
     file.read(reinterpret_cast<char*>(buffer.get()), size);
 
     for(size_t i = 0; i < static_cast<size_t>(size); ++i) {
-	memory[START_ADDRESS + i] = buffer[i];
+        memory[START_ADDRESS + i] = buffer[i];
     }
     
     printf("Loaded ROM with size of %luB.\n", size);
@@ -103,9 +103,9 @@ void Chip8::emulate_cycle() {
     
     uint16_t index = (opcode & 0xF000) >> 12; 
     if(opcode_table[index]) { 
-	(this->*opcode_table[index])(opcode); 
+        (this->*opcode_table[index])(opcode); 
     } else { 
-	throw std::runtime_error("Unhandled opcode, exiting program."); 
+        throw std::runtime_error("Unhandled opcode, exiting program."); 
     }
 }
 
@@ -113,9 +113,9 @@ void Chip8::opcode0_lookup(uint16_t opcode) {
     uint16_t index = (opcode & 0x000F);
 
     if(opcode_st0[index]) {
-	(this->*opcode_st0[index])(opcode);
+        (this->*opcode_st0[index])(opcode);
     } else {
-	// unhandled machine code routine call
+        // unhandled machine code routine call
     }
 }
 
@@ -159,7 +159,7 @@ void Chip8::opcode3xkk(uint16_t opcode) {
     uint8_t kk = opcode & 0x00FF;
 
     if(V[x] == kk) {
-	pc += 2;
+        pc += 2;
     }
 }
 
@@ -169,7 +169,7 @@ void Chip8::opcode4xkk(uint16_t opcode) {
     uint8_t kk = opcode & 0x00FF;
 
     if(V[x] != kk) {
-	pc += 2;
+        pc += 2;
     }
 }
 
@@ -179,7 +179,7 @@ void Chip8::opcode5xy0(uint16_t opcode) {
     uint8_t y = (opcode & 0x00F0) >> 4;
     
     if(V[x] == V[y]) {
-	pc += 2;    
+        pc += 2;    
     }
 }
 
@@ -322,11 +322,11 @@ void Chip8::opcodeDxyn(uint16_t opcode) {
 
             int px_x = (pos_x + col) % DISPLAY_WIDTH;
             int px_y = (pos_y + row) % DISPLAY_HEIGHT;
+            
+            int px_idx = px_y * DISPLAY_WIDTH + px_x;
+            if(display[px_idx]) V[0xF] = 1;
 
-            int idx = px_y * DISPLAY_WIDTH + px_x;
-            if(display[idx]) V[0xF] = 1;
-
-            display[idx] ^=1;
+            display[px_idx] ^=1;
         }
     }
 }
@@ -421,7 +421,7 @@ void Chip8::opcodeFx55(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
     for(uint8_t i = 0; i <= x; ++i) {
-	memory[I + i] = V[i];
+        memory[I + i] = V[i];
     }
 }
 
@@ -430,6 +430,6 @@ void Chip8::opcodeFx65(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
     for(uint8_t i = 0; i <= x; ++i) {
-	V[i] = memory[I + i];
+        V[i] = memory[I + i];
     }
 }
